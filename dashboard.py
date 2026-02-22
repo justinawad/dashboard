@@ -15,7 +15,7 @@ from pypdf import PdfReader
 from sklearn.metrics.pairwise import cosine_similarity
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import numpy as np
-from langchain_huggingface import HuggingFaceEndpoint
+from langchain_huggingface import HuggingFaceEndpoint  
 from langchain_core.output_parsers import JsonOutputParser  
 from langchain_groq import ChatGroq  
 from dotenv import load_dotenv
@@ -28,7 +28,7 @@ load_dotenv()
 
 # Récupérer la clé
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-MODEL_NAME = "llama-3.3-70b-versatile" # Un des meilleurs modèles au monde, gratuit sur Groq
+MODEL_NAME = "llama-3.1-8b-instant" 
 
 st.markdown("""
 <style>
@@ -117,7 +117,7 @@ def extract_job_keywords(job_text):
     llm = ChatGroq(
         temperature=0.1,
         groq_api_key=GROQ_API_KEY,
-        model_name="llama-3.3-70b-versatile"
+        model_name="llama-3.1-8b-instant"
     )
 
     # 3. Enhanced Prompt for strict JSON
