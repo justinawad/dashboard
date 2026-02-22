@@ -11,3 +11,5 @@ pypdf
 sentence-transformers 
 langchain-groq 
 python-dotenv
+langchain-huggingface 
+xgboost
