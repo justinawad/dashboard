@@ -2,11 +2,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import google.generativeai as genai
+
 import os
-import json
+
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 import time 
 import pickle 
 from collections import Counter  
@@ -15,19 +15,21 @@ from pypdf import PdfReader
 from sklearn.metrics.pairwise import cosine_similarity
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import numpy as np
-from langchain_huggingface import HuggingFaceEndpoint  
+import random
 from langchain_core.output_parsers import JsonOutputParser  
-from langchain_groq import ChatGroq  
+from langchain_groq import ChatGroq   
+from PIL import Image
 from dotenv import load_dotenv
 # ==========================================
 # 1. CONFIGURATION & STYLING PRO
-# ==========================================
-st.set_page_config(page_title="PredicIT", page_icon="💼", layout="wide", initial_sidebar_state="expanded") 
+# ========================================== 
+icon = Image.open("logo.png")
+st.set_page_config(page_title="Market_Visualizer", page_icon= icon, layout="wide", initial_sidebar_state="expanded") 
 # Charger les variables du fichier .env
 load_dotenv()  
 
 # Récupérer la clé
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+KEYS = os.getenv("GROQ_API_KEY").split(",")
 MODEL_NAME = "llama-3.1-8b-instant" 
 
 st.markdown("""
@@ -112,11 +114,11 @@ def extract_job_keywords(job_text):
 
     # 1. Initialize the Parser
     parser = JsonOutputParser()
-
+    selected_keys = random.choice(KEYS)
     # 2. Initialize the LLM (Groq)
     llm = ChatGroq(
         temperature=0.1,
-        groq_api_key=GROQ_API_KEY,
+        groq_api_key=selected_keys,
         model_name="llama-3.1-8b-instant"
     )
 
@@ -141,9 +143,16 @@ def extract_job_keywords(job_text):
         return response if isinstance(response, list) else []
         
     except Exception as e:
-        # If there is a parsing error, we print it for debug but return empty list to keep app running
-        print(f"DEBUG - Parsing Error: {e}")
-        return []
+    # Affichage du message d'erreur "Pro"
+        st.error("**Oups ! Le model  est momentanément très sollicité.**")
+        st.warning("""
+        En raison d'une forte affluence sur la plateforme (200+ utilisateurs simultanés), 
+        le serveur a atteint sa limite de vitesse temporaire.
+        
+        **Action :** Pas d'inquiétude ! Tes données sont conservées. 
+        Patiente environ **30 à 60 secondes** et retry.
+        """)
+   
 # ==========================================
 # 3. DATA LOADING
 # ==========================================
@@ -303,7 +312,7 @@ if 'extracted_skills' not in st.session_state:
 # ==========================================
 
 # HEADER
-st.title("PredicIT • Talent Intelligence & Compensation Analytics")
+st.title("Market_Visualizer • Talent Intelligence & Compensation Analytics")
 st.markdown(f"Analyse de marché pour **{target_metier}** en **{target_region}**.")
 st.divider()
 
@@ -381,13 +390,13 @@ if st.session_state['prediction']:
             <h1 style="color: #2563eb;">Rapport : {target_metier}</h1>
             <p><strong>Région :</strong> {target_region}</p>
             <hr>
-            <h2>💰 Estimation : {pred['val']:,.0f} € / an</h2>
+            <h2> Estimation : {pred['val']:,.0f} € / an</h2>
             <br><p><em>Généré par PrediSalaire.ai</em></p>
         </body>
         </html>
         """
         st.download_button(
-            label="📥 Télécharger Rapport",
+            label=" Télécharger Rapport",
             data=html_report,
             file_name=f"Rapport_{target_metier}.html",
             mime="text/html",
@@ -396,7 +405,7 @@ if st.session_state['prediction']:
         )
 
     with col_title:
-        st.markdown(f"### 📍 Analyse : **{target_metier}** en **{target_region}**")
+        st.markdown(f"###  Analyse : **{target_metier}** en **{target_region}**")
 
     st.markdown("---")
 
@@ -404,11 +413,11 @@ if st.session_state['prediction']:
     col_map_filters, col_map_viz = st.columns([1, 3])
     
     with col_map_filters:
-        st.markdown("#### ⚙️ Carte")
+        st.markdown("####  Carte")
         # AJOUT DES CLÉS UNIQUES (key=...) POUR CORRIGER TON ERREUR
-        view_mode = st.radio("📍 Zoom :", ["Région", "Département"], index=0, key="radio_map_zoom")
+        view_mode = st.radio("Zoom :", ["Région", "Département"], index=0, key="radio_map_zoom")
         st.write("") 
-        metric_label = st.radio("📊 Indicateur :", ["Médiane", "Moyenne"], index=0, key="radio_map_metric")
+        metric_label = st.radio(" Indicateur :", ["Médiane", "Moyenne"], index=0, key="radio_map_metric")
         metric_func = 'median' if "Médiane" in metric_label else 'mean'
 
     with col_map_viz:
@@ -435,7 +444,7 @@ if st.session_state['prediction']:
             st.error("Carte indisponible.")
 
     # --- C. INDICATEURS CLÉS (KPIs) ---
-    st.markdown("### 📊 Indicateurs Clés")
+    st.markdown("### Indicateurs Clés")
     
     col1, col2, col3, col4 = st.columns(4)
     
@@ -542,11 +551,11 @@ with tab_candidat:
         if uploaded_cv:
             b1, b2, b3 = st.columns(3)
             action_prompt = None
-            if b1.button("📊 Analyser CV", use_container_width=True):
+            if b1.button(" Analyser CV", use_container_width=True):
                 action_prompt = "Analyse mon CV par rapport à ce poste. Points forts/faibles ?"
-            if b2.button("⚖️ Comparer", use_container_width=True):
+            if b2.button(" Comparer", use_container_width=True):
                 action_prompt = f"Donne mon score de compatibilité pour le poste de {target_metier}."
-            if b3.button("📝 Lettre Motiv'", use_container_width=True):
+            if b3.button("Lettre Motiv'", use_container_width=True):
                 action_prompt = "Rédige une lettre de motivation courte."
 
             if action_prompt:
@@ -554,9 +563,10 @@ with tab_candidat:
                 with chat_container:
                     with st.chat_message("user"): st.markdown(action_prompt)
                     with st.chat_message("assistant"):
-                        with st.spinner("Qwen réfléchit..."):
-                            # APPEL AU NOUVEAU RAG ENGINE
-                            qa_chain = get_rag_chain(st.session_state.vector_store_candidat, GROQ_API_KEY)
+                        with st.spinner("réfléchit..."):
+                            # APPEL AU NOUVEAU RAG ENGINE 
+                            selected_key = random.choice(KEYS)
+                            qa_chain = get_rag_chain(st.session_state.vector_store_candidat,selected_key)
                             
                             full_query = f"ACTION: {action_prompt} | OFFRE: {target_desc[:500]}"
                             response = qa_chain.invoke(full_query)
