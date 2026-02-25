@@ -1,5 +1,6 @@
 from urllib.parse import unquote
 
+import joblib
 import requests
 import streamlit as st
 import pandas as pd
