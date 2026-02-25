@@ -25,7 +25,80 @@ from dotenv import load_dotenv
 # ========================================== 
 icon = Image.open("logo.png")
 st.set_page_config(page_title="Market_Visualizer", page_icon= icon, layout="wide", initial_sidebar_state="expanded") 
-# Charger les variables du fichier .env
+# Charger les variables du fichier .env 
+# --- AJOUTER CE BLOC CSS AU DÉBUT ---
+st.markdown("""
+<style>
+    /* --- 1. STYLE DES CARTES KPI (WIDGETS) --- */
+    .metric-card {
+        background-color: #ffffff;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 20px 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        text-align: center;
+        transition: transform 0.2s;
+        height: 100%;
+    }
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    }
+    .metric-label {
+        font-size: 14px;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 5px;
+        font-weight: 600;
+    }
+    .metric-value {
+        font-size: 26px;
+        font-weight: 800;
+        color: #0f172a;
+    }
+    .highlight {
+        color: #2563eb;
+    }
+
+    /* --- 2. STYLE UNIFORME DES BOUTONS (FORCE BLEU) --- */
+    
+    /* Cible tous les boutons Streamlit (Primaires, Secondaires, Download) */
+    div.stButton > button, 
+    div.stDownloadButton > button {
+        background-color: #2563eb !important;    /* Bleu officiel */
+        color: white !important;                 /* Texte blanc */
+        border: 1px solid #2563eb !important;    /* Bordure bleue (cache le gris) */
+        border-radius: 8px !important;           /* Coins arrondis */
+        font-weight: 600 !important;             /* Texte gras */
+        padding: 0.5rem 1rem !important;
+        width: 100% !important;                  /* Prend toute la largeur dispo */
+        transition: all 0.3s ease !important;
+    }
+
+    /* Effet au Survol (Hover) */
+    div.stButton > button:hover, 
+    div.stDownloadButton > button:hover {
+        background-color: #1d4ed8 !important;    /* Bleu plus foncé */
+        border-color: #1d4ed8 !important;
+        color: white !important;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
+        transform: translateY(-2px) !important;
+    }
+
+    /* Effet au Clic (Active) et Focus */
+    div.stButton > button:active, 
+    div.stButton > button:focus:not(:active),
+    div.stDownloadButton > button:active {
+        background-color: #1e40af !important;    /* Bleu très foncé */
+        border-color: #1e40af !important;
+        color: white !important;
+        box-shadow: none !important;
+    }
+
+</style>
+""", unsafe_allow_html=True) 
+
 load_dotenv()  
 
 # Récupérer la clé
@@ -124,9 +197,9 @@ def extract_job_keywords(job_text):
 
     # 3. Enhanced Prompt for strict JSON
     prompt_text = f"""
-    You are a Technical Recruiter. Extract technical keywords from this job description.
+    You are a Technical Recruiter. Extract technical keywords from this job description only the skills ex (SQL , python , docker , git).
     Return ONLY a JSON list of objects with keys: "keyword", "type", "importance_score".
-    
+    n.b : the importance_score is between 0 to 100 % 
     JOB TEXT:
     {job_text}
     
@@ -299,7 +372,7 @@ target_desc = st.sidebar.text_area("Description de l'offre", height=200, placeho
 known_skills = ["Python", "SQL", "Java", "AWS", "Azure", "Docker", "Kubernetes", "React", "Terraform"]
 target_skills = st.sidebar.multiselect("Compétences Clés (Filtre Dashboard)", known_skills)
 
-predict_btn = st.sidebar.button("✨ Lancer la Prédiction", use_container_width=True)
+predict_btn = st.sidebar.button(" Lancer la Prédiction", use_container_width=True)
 
 # Session State for prediction persistence
 if 'prediction' not in st.session_state:
@@ -382,26 +455,105 @@ if st.session_state['prediction']:
     col_dl, col_title = st.columns([1, 4])
     
     with col_dl:
-        # Génération HTML pour PDF
+        # 1. PRÉPARATION DES DONNÉES POUR LE RAPPORT
+        import datetime
+        date_jour = datetime.datetime.now().strftime("%d/%m/%Y")
+        
+        # On crée les badges HTML pour les compétences
+        skills_html = ""
+        if st.session_state['extracted_skills']:
+            for s in st.session_state['extracted_skills']:
+                skills_html += f"<span class='badge'>{s['keyword']} ({s['importance_score']}%)</span>"
+        else:
+            skills_html = "<i>Aucune compétence technique spécifique détectée.</i>"
+
+        # 2. DESIGN DU RAPPORT (CSS PRO + CONTENU)
         html_report = f"""
+        <!DOCTYPE html>
         <html>
-        <head><title>Rapport {target_metier}</title></head>
-        <body style="font-family: Arial; padding: 40px;">
-            <h1 style="color: #2563eb;">Rapport : {target_metier}</h1>
-            <p><strong>Région :</strong> {target_region}</p>
-            <hr>
-            <h2> Estimation : {pred['val']:,.0f} € / an</h2>
-            <br><p><em>Généré par PrediSalaire.ai</em></p>
+        <head>
+            <meta charset="UTF-8">
+            <title>Rapport - {target_title}</title>
+            <style>
+                body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f4f9; padding: 40px; color: #333; }}
+                .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
+                
+                /* Header */
+                .header {{ border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }}
+                .logo {{ font-size: 24px; font-weight: bold; color: #2563eb; }}
+                .date {{ color: #888; font-size: 14px; }}
+                
+                /* Salary Box */
+                .salary-box {{ background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 40px; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2); }}
+                .salary-title {{ text-transform: uppercase; font-size: 14px; letter-spacing: 1px; opacity: 0.9; margin-bottom: 5px; }}
+                .salary-amount {{ font-size: 48px; font-weight: 700; margin: 0; }}
+                .salary-range {{ font-size: 18px; margin-top: 10px; opacity: 0.9; background: rgba(255,255,255,0.2); display: inline-block; padding: 5px 15px; border-radius: 20px; }}
+
+                /* Sections */
+                .section-title {{ font-size: 18px; font-weight: 700; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #2563eb; padding-left: 10px; }}
+                
+                /* Grid Info */
+                .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
+                .info-item {{ background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }}
+                .label {{ font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 5px; }}
+                .value {{ font-size: 16px; font-weight: 600; color: #0f172a; }}
+
+                /* Badges Skills */
+                .badge {{ display: inline-block; background-color: #e0f2fe; color: #0369a1; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-right: 5px; margin-bottom: 5px; }}
+
+                /* Description */
+                .desc-box {{ background: #fff; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; font-size: 14px; line-height: 1.6; color: #475569; white-space: pre-wrap; }}
+
+                /* Footer */
+                .footer {{ margin-top: 50px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">Market_Visualiser</div>
+                    <div class="date">Rapport généré le {date_jour}</div>
+                </div>
+
+                <div class="salary-box">
+                    <div class="salary-title">Estimation du Salaire Annuel Brute </div>
+                    <div class="salary-amount">{pred['val']:,.0f} €</div>
+                    <div class="salary-range">Fourchette : {pred['range'][0]:,.0f} € - {pred['range'][1]:,.0f} €</div>
+                </div>
+
+                <div class="section-title">Détails du Poste</div>
+                <div class="grid">
+                    <div class="info-item"><span class="label">Intitulé</span><span class="value">{target_title}</span></div>
+                    <div class="info-item"><span class="label">Catégorie Métier</span><span class="value">{target_metier}</span></div>
+                    <div class="info-item"><span class="label">Région</span><span class="value">{target_region}</span></div>
+                    <div class="info-item"><span class="label">Expérience</span><span class="value">{target_experience}</span></div>
+                </div>
+
+                <div class="section-title">Analyse Sémantique (Compétences Clés)</div>
+                <div>
+                    {skills_html}
+                </div>
+
+                <div class="section-title">Description Originale</div>
+                <div class="desc-box">{target_desc}</div>
+
+                <div class="footer">
+                    Ce rapport a été généré automatiquement .<br>
+                    &copy; 2026 Market_Visualizer - Tous droits réservés.
+                </div>
+            </div>
         </body>
         </html>
-        """
+        """ 
+        
+        
         st.download_button(
-            label=" Télécharger Rapport",
+            label=" Télécharger Rapport Complet",
             data=html_report,
-            file_name=f"Rapport_{target_metier}.html",
+            file_name=f"Rapport_Complet_{target_metier}.html",
             mime="text/html",
             use_container_width=True,
-            key="btn_download_header" # Clé unique pour éviter l'erreur
+            key="btn_download_full_report"
         )
 
     with col_title:
@@ -446,22 +598,44 @@ if st.session_state['prediction']:
     # --- C. INDICATEURS CLÉS (KPIs) ---
     st.markdown("### Indicateurs Clés")
     
-    col1, col2, col3, col4 = st.columns(4)
+    # ... (Dans ta section affichage) ...
+
+    c1, c2, c3, c4 = st.columns(4)
     
+    # Calculs préalables (si pas déjà faits)
     mask_context = (df['metier'] == target_metier) & (df['region'] == target_region)
     market_data = df[mask_context]
     market_val = market_data['salaire_avg'].median() if not market_data.empty else 0
     sample_size = len(market_data)
-    
-    with col1:
-        st.markdown(f"""<div class="metric-card"><div class="metric-label">Salaire Estimé (IA)</div><div class="metric-value highlight">{pred['val']:,.0f} €</div></div>""", unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""<div class="metric-card"><div class="metric-label">Marché ({target_region})</div><div class="metric-value">{market_val:,.0f} €</div></div>""", unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"""<div class="metric-card"><div class="metric-label">Fourchette Probable</div><div class="metric-value" style="font-size:1.4rem">{pred['range'][0]:,.0f} - {pred['range'][1]:,.0f}</div></div>""", unsafe_allow_html=True)
-    with col4:
-        conf_txt = "Élevée" if sample_size > 30 else "Faible"
-        st.markdown(f"""<div class="metric-card"><div class="metric-label">Fiabilité</div><div class="metric-value">{conf_txt}</div><small>{sample_size} offres</small></div>""", unsafe_allow_html=True)
+
+    # --- AFFICHAGE DES CARTE ---
+    with c1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Salaire Estimé (Brut)</div>
+            <div class="metric-value highlight">{pred['val']:,.0f} €</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Marché ({target_region})</div>
+            <div class="metric-value">{market_val:,.0f} €</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Fourchette Probable</div>
+            <div class="metric-value" style="font-size: 1.2rem;">{pred['range'][0]:,.0f} - {pred['range'][1]:,.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+
+    st.markdown("---")
 
     st.markdown("---")
 
@@ -518,10 +692,10 @@ if st.session_state['prediction']:
     # 8. CENTRE DE CARRIÈRE & RECRUTEMENT
     # ==========================================
     st.header("Centre de Recrutement & Carrière")
-tab_candidat, tab_recruteur = st.tabs(["👤 Espace Candidat (Coach IA)", "🏢 Espace Recruteur (Tri CVs)"])
+tab_candidat, tab_recruteur = st.tabs([" Espace Candidat (optimiser vos candidature)", " Espace Recruteur (Tri CVs)"])
 
 with tab_candidat:
-    st.info(f"**Mode Coaching Qwen :** Posez vos questions sur votre compatibilité avec le poste.")
+    st.info(f"** Posez vos questions sur votre compatibilité avec le poste.")
     col_cv, col_chat = st.columns([1, 2])
 
     with col_cv:
