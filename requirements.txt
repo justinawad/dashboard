@@ -14,3 +14,4 @@ sentence-transformers
 faiss-cpu
 python-dotenv
 Pillow 
+langchain-groq
