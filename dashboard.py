@@ -25,8 +25,7 @@ from dotenv import load_dotenv
 # ========================================== 
 icon = Image.open("logo.png")
 st.set_page_config(page_title="Market_Visualizer", page_icon= icon, layout="wide", initial_sidebar_state="expanded") 
-# Charger les variables du fichier .env 
-# --- AJOUTER CE BLOC CSS AU DÉBUT ---
+
 st.markdown("""
 <style>
     /* --- 1. STYLE DES CARTES KPI (WIDGETS) --- */
@@ -160,7 +159,7 @@ st.markdown("""
 # 2. HELPER FUNCTIONS & MOCK ML MODEL
 # ==========================================
 
-# --- Placeholder for your specific ML Model Loading ---
+
 
 @st.cache_resource
 def load_prediction_model():
@@ -216,7 +215,7 @@ def extract_job_keywords(job_text):
         return response if isinstance(response, list) else []
         
     except Exception as e:
-    # Affichage du message d'erreur "Pro"
+
         st.error("**Oups ! Le model  est momentanément très sollicité.**")
         st.warning("""
         En raison d'une forte affluence sur la plateforme (200+ utilisateurs simultanés), 
@@ -356,9 +355,8 @@ target_metier = st.sidebar.selectbox("Métier", options=sorted(df['metier'].uniq
 # 2. Region - Gets list from your CSV
 target_region = st.sidebar.selectbox("Région", options=sorted(df['region'].unique()))
 
-# 3. Experience (CRITICAL for your model)
-# These MUST match exactly what is in your CSV column 'experience_finale'
-# Adjust these strings if your CSV is slightly different (e.g. "Junior (0-2 ans)")
+# 3. Experience 
+
 exp_options = ["Junior (0-2 ans)", "Intermédiaire (2-5 ans)", "Senior (5+ ans)", "Non spécifié"]
 target_experience = st.sidebar.selectbox("Expérience", options=exp_options)
 
@@ -368,7 +366,7 @@ target_title = st.sidebar.text_input("Intitulé du Poste", "Data Scientist")
 # 5. Description
 target_desc = st.sidebar.text_area("Description de l'offre", height=200, placeholder="Collez la description ici...")
 
-# Optional manual skills (Kept for filtering, though model uses Description)
+
 known_skills = ["Python", "SQL", "Java", "AWS", "Azure", "Docker", "Kubernetes", "React", "Terraform"]
 target_skills = st.sidebar.multiselect("Compétences Clés (Filtre Dashboard)", known_skills)
 
@@ -467,7 +465,7 @@ if st.session_state['prediction']:
         else:
             skills_html = "<i>Aucune compétence technique spécifique détectée.</i>"
 
-        # 2. DESIGN DU RAPPORT (CSS PRO + CONTENU)
+    
         html_report = f"""
         <!DOCTYPE html>
         <html>
@@ -595,20 +593,20 @@ if st.session_state['prediction']:
         else:
             st.error("Carte indisponible.")
 
-    # --- C. INDICATEURS CLÉS (KPIs) ---
+    # --- C. KPIs---
     st.markdown("### Indicateurs Clés")
     
-    # ... (Dans ta section affichage) ...
+ 
 
     c1, c2, c3, c4 = st.columns(4)
     
-    # Calculs préalables (si pas déjà faits)
+
     mask_context = (df['metier'] == target_metier) & (df['region'] == target_region)
     market_data = df[mask_context]
     market_val = market_data['salaire_avg'].median() if not market_data.empty else 0
     sample_size = len(market_data)
 
-    # --- AFFICHAGE DES CARTE ---
+    # --- AFFICHAGE DE la CARTE ---
     with c1:
         st.markdown(f"""
         <div class="metric-card">
@@ -749,8 +747,8 @@ with tab_candidat:
                             st.markdown(response)
                     
                   
-                    # On laisse Streamlit finir le script. Au prochain clic, l'historique sera réaffiché par le bloc 3.
-    # --- ONGLET 2 : RECRUTEUR (Bulk) ---
+                   
+    # --- ONGLET 2 : RECRUTEUR ---
     with tab_recruteur:
         st.markdown("#### 📂 Analyse d'un dossier de resume")
         st.write(f"Identifiez instantanément les meilleurs profils pour le poste de **{target_metier}**.")

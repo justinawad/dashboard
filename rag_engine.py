@@ -20,7 +20,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 # CONFIGURATION
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
-# --- CE MODÈLE EST LE PLUS STABLE POUR L'API GRATUITE ---
+
 HUGGINGFACE_MODEL = "HuggingFaceH4/zephyr-7b-beta"
 
 RAG_PROMPT_TEMPLATE = """
@@ -63,7 +63,7 @@ def get_rag_chain(vector_store, groq_api_key):
     retriever = vector_store.as_retriever(search_kwargs={"k": 3})
     prompt = PromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
 
-    # La chaîne LCEL reste la même, elle est juste 10x plus rapide maintenant !
+
     rag_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
