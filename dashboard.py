@@ -392,7 +392,9 @@ if predict_btn:
                     'text_features': [text_input],
                     'metier': [target_metier],
                     'experience': [target_experience],
-                    'region': [target_region]
+                    'region': [target_region] ,
+                    'desc' : [target_desc],
+                    "competences":[target_skills]
                 })
 
                 try:
