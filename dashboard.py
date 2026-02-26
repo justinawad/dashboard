@@ -775,7 +775,7 @@ def avis_dialog():
         # Exemple : appel API pour enregistrer l'avis (à adapter)
         try:
             payload = {
-                "dates":"f{times}",
+                "dates":f"{times}",
                 "satisfaction": f"{satisfaction}",
                 "commentaire": f"{commentaire}",
             }
