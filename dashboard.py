@@ -763,7 +763,8 @@ with tab_recruteur:
 @st.dialog("Donnez votre avis", width="medium")
 def avis_dialog():
     st.write("Nous serions ravis d'avoir votre avis sur l'application")
-    st.write(token_user)
+    token_encode = st.query_params.get("us", "")
+    token_users = unquote(token_encode)
     times = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     satisfaction = st.slider("Votre satisfaction globale", 1, 5, 4, 1)
     commentaire = st.text_area(
@@ -790,7 +791,7 @@ def avis_dialog():
                 "https://predict-production-28b1.up.railway.app/api/predict/feedback",
                 headers={
                     'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {token_user}'
+                    'Authorization': f'Bearer {token_users}'
                 },
                 json=payload,
             )
@@ -800,9 +801,9 @@ def avis_dialog():
                 st.warning("Avis envoyé, mais le serveur a retourné une réponse inattendue.")
         except Exception as e:
             st.error(f"Erreur lors de l'envoi de l'avis : {e}")
+        st.rerun()
 
         # Ferme le modal en forçant un rerun
-        st.rerun()
 
     if annuler:
         # Ferme simplement le modal
