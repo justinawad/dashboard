@@ -11,10 +11,10 @@ import os
 
 import numpy as np
 from datetime import datetime
-import time 
-import pickle 
-from collections import Counter  
-from rag_engine import process_pdf_and_create_vector_db, get_rag_chain 
+import time
+import pickle
+from collections import Counter
+from rag_engine import process_pdf_and_create_vector_db, get_rag_chain
 from pypdf import PdfReader
 from sklearn.metrics.pairwise import cosine_similarity
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -22,16 +22,18 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_groq import ChatGroq
 import numpy as np
 import random
-from langchain_core.output_parsers import JsonOutputParser  
-from langchain_groq import ChatGroq   
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_groq import ChatGroq
 from PIL import Image
 from dotenv import load_dotenv
+
 # ==========================================
 # 1. CONFIGURATION & STYLING PRO
-# ========================================== 
+# ==========================================
 icon = Image.open("logo.png")
-st.set_page_config(page_title="Market_Visualizer", page_icon= icon, layout="wide", initial_sidebar_state="expanded") 
+st.set_page_config(page_title="Market_Visualizer", page_icon=icon, layout="wide", initial_sidebar_state="expanded")
 
+# ---- CSS GLOBAL (cartes + boutons) ----
 st.markdown("""
 <style>
     /* --- 1. STYLE DES CARTES KPI (WIDGETS) --- */
@@ -66,50 +68,58 @@ st.markdown("""
         color: #2563eb;
     }
 
-    /* --- 2. STYLE UNIFORME DES BOUTONS (FORCE BLEU) --- */
-    
-    /* Cible tous les boutons Streamlit (Primaires, Secondaires, Download) */
-    div.stButton > button, 
+    /* --- 2. STYLE UNIFORME DES BOUTONS (BLEU PAR DÉFAUT) --- */
+    div.stButton > button,
     div.stDownloadButton > button {
-        background-color: #2563eb !important;    /* Bleu officiel */
-        color: white !important;                 /* Texte blanc */
-        border: 1px solid #2563eb !important;    /* Bordure bleue (cache le gris) */
-        border-radius: 8px !important;           /* Coins arrondis */
-        font-weight: 600 !important;             /* Texte gras */
+        background-color: #2563eb !important;
+        color: white !important;
+        border: 1px solid #2563eb !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
         padding: 0.5rem 1rem !important;
-        width: 100% !important;                  /* Prend toute la largeur dispo */
+        width: 100% !important;
         transition: all 0.3s ease !important;
     }
 
-    /* Effet au Survol (Hover) */
-    div.stButton > button:hover, 
+    div.stButton > button:hover,
     div.stDownloadButton > button:hover {
-        background-color: #1d4ed8 !important;    /* Bleu plus foncé */
+        background-color: #1d4ed8 !important;
         border-color: #1d4ed8 !important;
         color: white !important;
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
         transform: translateY(-2px) !important;
     }
 
-    /* Effet au Clic (Active) et Focus */
-    div.stButton > button:active, 
+    div.stButton > button:active,
     div.stButton > button:focus:not(:active),
     div.stDownloadButton > button:active {
-        background-color: #1e40af !important;    /* Bleu très foncé */
+        background-color: #1e40af !important;
         border-color: #1e40af !important;
         color: white !important;
         box-shadow: none !important;
     }
 
+    /* --- 3. STYLE SPÉCIFIQUE POUR LE BOUTON D'AVIS (KEY=btn_avis) --- */
+    .st-key-btn_avis button {
+        background-color: #f97316 !important;   /* orange */
+        border-color: #f97316 !important;
+        color: #ffffff !important;
+    }
+    .st-key-btn_avis button:hover {
+        background-color: #ea580c !important;
+        border-color: #ea580c !important;
+        box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3) !important;
+    }
 </style>
-""", unsafe_allow_html=True) 
+""", unsafe_allow_html=True)  # [web:18][web:21]
 
-load_dotenv()  
+load_dotenv()
 
 # Récupérer la clé
 KEYS = os.getenv("GROQ_API_KEY").split(",")
-MODEL_NAME = "llama-3.1-8b-instant" 
+MODEL_NAME = "llama-3.1-8b-instant"
 
+# ---- CSS LAYOUT / TABS ----
 st.markdown("""
 <style>
     /* Réduire le vide en haut de page */
@@ -119,14 +129,14 @@ st.markdown("""
         padding-left: 2rem;
         padding-right: 2rem;
     }
-    
+
     /* Style des titres H1, H2, H3 */
     h1, h2, h3 {
-        color: #0f172a; 
+        color: #0f172a;
         font-family: 'Inter', sans-serif;
         font-weight: 700;
     }
-    
+
     /* Style des Cartes KPI (Metric Cards) */
     div[data-testid="metric-container"] {
         background-color: white;
@@ -138,9 +148,9 @@ st.markdown("""
 
     /* Supprimer l'espace vide sous les graphiques Plotly */
     .js-plotly-plot .plotly .modebar {
-        display: none !important; /* Cache la barre d'outils au survol */
+        display: none !important;
     }
-    
+
     /* Style des onglets (Tabs) */
     .stTabs [data-baseweb="tab-list"] {
         gap: 10px;
@@ -165,13 +175,11 @@ st.markdown("""
 # 2. HELPER FUNCTIONS & MOCK ML MODEL
 # ==========================================
 
-
-
 @st.cache_resource
 def load_prediction_model():
     """Loads the real XGBoost model."""
     model_path = "salary_model_xgboost.pkl"
-    
+
     if os.path.exists(model_path):
         try:
             model = joblib.load(model_path)
@@ -184,204 +192,154 @@ def load_prediction_model():
         st.error("Model file not found. Please put 'salary_model_xgboost.pkl' in the folder.")
         return None
 
-
-
-
-
-
 @st.cache_data(show_spinner=False)
 def extract_job_keywords(job_text):
     if not job_text or len(job_text) < 10:
         return []
 
-    # 1. Initialize the Parser
     parser = JsonOutputParser()
     selected_keys = random.choice(KEYS)
-    # 2. Initialize the LLM (Groq)
     llm = ChatGroq(
         temperature=0.1,
         groq_api_key=selected_keys,
         model_name="llama-3.1-8b-instant"
     )
 
-    # 3. Enhanced Prompt for strict JSON
     prompt_text = f"""
     You are a Technical Recruiter. Extract technical keywords from this job description only the skills ex (SQL , python , docker , git).
     Return ONLY a JSON list of objects with keys: "keyword", "type", "importance_score".
     n.b : the importance_score is between 0 to 100 % 
     JOB TEXT:
     {job_text}
-    
+
     Format instructions: {parser.get_format_instructions()}
     """
 
     try:
-        # We use a chain: Prompt -> LLM -> Parser
-        # The parser automatically handles stripping ```json ``` blocks
         chain = llm | parser
         response = chain.invoke(prompt_text)
-        
-        # Ensure it returns a list
         return response if isinstance(response, list) else []
-        
     except Exception as e:
-
-        st.error("**Oups ! Le model  est momentanément très sollicité.**")
+        st.error("**Oups ! Le model est momentanément très sollicité.**")
         st.warning("""
         En raison d'une forte affluence sur la plateforme (200+ utilisateurs simultanés), 
         le serveur a atteint sa limite de vitesse temporaire.
-        
+
         **Action :** Pas d'inquiétude ! Tes données sont conservées. 
         Patiente environ **30 à 60 secondes** et retry.
         """)
-   
+
 # ==========================================
 # 3. DATA LOADING
 # ==========================================
 @st.cache_data
 def load_data():
-    # POINT TO YOUR REAL FILE
-    path = "data/cleaned_dataset_domaine_info.csv" 
-    
+    path = "data/cleaned_dataset_domaine_info.csv"
+
     if os.path.exists(path):
         df = pd.read_csv(path)
-        # Ensure salary is numeric
         df['salaire_avg'] = pd.to_numeric(df['salaire_avg'], errors='coerce')
         df = df.dropna(subset=['salaire_avg'])
-        
-        # Create a fake date if you don't have one (for the charts)
-        # If you scrapped it, ensure it is converted to datetime
+
         if 'date_publication' not in df.columns:
-            # Fake dates for the dashboard visuals
             df['date_publication'] = pd.date_range(end=datetime.now(), periods=len(df)).tolist()
         else:
             df['date_publication'] = pd.to_datetime(df['date_publication'])
-            
+
         return df
     else:
         st.error(f"File not found: {path}")
-        return pd.DataFrame() # Return empty if fail 
-
+        return pd.DataFrame()
 
 def get_top_skills_for_job(df, job_name):
-    """Récupère les 5 compétences les plus citées pour un métier donné"""
-    # 1. On filtre les offres du métier
     subset = df[df['metier'] == job_name]
-    
-    # 2. On rassemble tous les textes de compétences
     all_text = ",".join(subset['competences'].dropna().astype(str).tolist())
-    
-    # 3. On nettoie et on compte
     skills_list = [s.strip().title() for s in all_text.split(',') if len(s.strip()) > 1]
     counter = Counter(skills_list)
-    
-    # 4. On retourne les 5 plus fréquents
     return [s[0] for s in counter.most_common(5)]
+
 @st.cache_data
 def load_geojson(scale="regions"):
-    """
-    Charge le GeoJSON des Régions ou des Départements.
-    """
     urls = {
         "regions": "https://france-geojson.gregoiredavid.fr/repo/regions.geojson",
         "departements": "https://france-geojson.gregoiredavid.fr/repo/departements.geojson"
     }
-    
+
     try:
         r = requests.get(urls[scale])
         return r.json()
     except Exception as e:
         st.error(f"Erreur de chargement de la carte ({scale}): {e}")
         return None
+
 df = load_data()
-geojson = load_geojson() 
+geojson = load_geojson()
 
 @st.cache_resource
 def load_embedding_model():
-    # On charge le modèle une seule fois pour gagner du temps
     return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 def rank_cvs(uploaded_files, job_description):
-    """
-    Compare une liste de CVs avec une description de poste.
-    Retourne un DataFrame avec les scores.
-    """
     embed_model = load_embedding_model()
-    
-    # 1. Vectoriser l'offre d'emploi (La référence)
+
     job_vector = embed_model.embed_query(job_description)
-    job_vector = np.array([job_vector]) # Format nécessaire pour le calcul
-    
+    job_vector = np.array([job_vector])
+
     results = []
-    
-    # 2. Boucle sur chaque CV
+
     progress_bar = st.progress(0)
     for i, file in enumerate(uploaded_files):
-        # Lecture PDF
         try:
             reader = PdfReader(file)
             text = ""
             for page in reader.pages:
                 text += page.extract_text()
-            
-            # Vectoriser le CV
+
             cv_vector = embed_model.embed_query(text)
             cv_vector = np.array([cv_vector])
-            
-            # Calcul du Score (0 à 100%)
+
             score = cosine_similarity(job_vector, cv_vector)[0][0]
-            
+
             results.append({
                 "Nom du Fichier": file.name,
-                "Score de Pertinence": round(score * 100, 2), # En pourcentage
-                "Texte Brut": text[:500] + "..." # Juste pour preview
+                "Score de Pertinence": round(score * 100, 2),
+                "Texte Brut": text[:500] + "..."
             })
         except Exception as e:
             print(f"Erreur fichier {file.name}: {e}")
-            
-        # Mise à jour barre de progression
+
         progress_bar.progress((i + 1) / len(uploaded_files))
-        
-    progress_bar.empty() # Enlever la barre à la fin
-    
-    # Création du DataFrame trié
+
+    progress_bar.empty()
+
     df_results = pd.DataFrame(results)
     if not df_results.empty:
         df_results = df_results.sort_values(by="Score de Pertinence", ascending=False)
-        
+
     return df_results
 
 # ==========================================
 # 4. SIDEBAR & INPUTS
 # ==========================================
 
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3098/3098090.png", width=50) 
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3098/3098090.png", width=50)
 st.sidebar.title("Configuration")
 
-# 1. Metier (Category) - Gets list from your CSV
 target_metier = st.sidebar.selectbox("Métier", options=sorted(df['metier'].unique()))
-
-# 2. Region - Gets list from your CSV
 target_region = st.sidebar.selectbox("Région", options=sorted(df['region'].unique()))
-
-# 3. Experience 
 
 exp_options = ["Junior (0-2 ans)", "Intermédiaire (2-5 ans)", "Senior (5+ ans)", "Non spécifié"]
 target_experience = st.sidebar.selectbox("Expérience", options=exp_options)
 
-# 4. Job Title
 target_title = st.sidebar.text_input("Intitulé du Poste", "Data Scientist")
-
-# 5. Description
 target_desc = st.sidebar.text_area("Description de l'offre", height=200, placeholder="Collez la description ici...")
-
 
 known_skills = ["Python", "SQL", "Java", "AWS", "Azure", "Docker", "Kubernetes", "React", "Terraform"]
 target_skills = st.sidebar.multiselect("Compétences Clés (Filtre Dashboard)", known_skills)
 
 predict_btn = st.sidebar.button(" Lancer la Prédiction", use_container_width=True)
 
-# Session State for prediction persistence
+# Session State
 if 'prediction' not in st.session_state:
     st.session_state['prediction'] = None
 if 'extracted_skills' not in st.session_state:
@@ -391,7 +349,6 @@ if 'extracted_skills' not in st.session_state:
 # 5. MAIN LOGIC FLOW
 # ==========================================
 
-# HEADER
 st.title("Market_Visualizer • Talent Intelligence & Compensation Analytics")
 st.markdown(f"Analyse de marché pour **{target_metier}** en **{target_region}**.")
 st.divider()
@@ -404,30 +361,28 @@ if predict_btn:
     if not target_desc:
         st.error("⚠️ Veuillez coller une description d'offre.")
     else:
-        # --- LOADING "MATRIX" ---
         with st.status(" Initialisation ", expanded=True) as status:
             st.write("Connexion ...")
             time.sleep(0.8)
-            
+
             st.write(" Analyse sémantique description...")
             ai_skills = extract_job_keywords(target_desc)
             st.session_state['extracted_skills'] = ai_skills
             time.sleep(0.5)
-            
+
             st.write("Agrégation des données régionales...")
-            # Préparation des inputs pour le modèle
             skills_str = ", ".join([s['keyword'] for s in ai_skills]) if ai_skills else ""
-            
+
             model = load_prediction_model()
-            
+
             if model:
                 text_input = (
-                    str(target_title) + " " + 
-                    str(target_metier) + " " + 
-                    str(skills_str) + " " + str(target_experience)+ " "+ str(target_region)+ " "+
+                    str(target_title) + " " +
+                    str(target_metier) + " " +
+                    str(skills_str) + " " + str(target_experience) + " " + str(target_region) + " " +
                     str(target_desc)
                 )
-                
+
                 input_df = pd.DataFrame({
                     'text_features': [text_input],
                     'metier': [target_metier],
@@ -436,32 +391,35 @@ if predict_btn:
                     "desc": [target_desc],
                     "competences": [target_skills]
                 })
-                
+
                 try:
                     pred_val = model.predict(input_df)[0]
                     pred_min = pred_val * 0.9
                     pred_max = pred_val * 1.1
-                    st.session_state['prediction'] = {"val": pred_val, "range": (pred_min, pred_max)}    
-                    status.update(label="✅ Analyse terminée avec succès !", state="complete", expanded=False) 
+                    st.session_state['prediction'] = {"val": pred_val, "range": (pred_min, pred_max)}
+                    status.update(label="✅ Analyse terminée avec succès !", state="complete", expanded=False)
+
                     dates = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                    token_encoded = st.query_params.get("us","")
+                    token_encoded = st.query_params.get("us", "")
                     token_user = unquote(token_encoded)
-                    requete_historique =  requests.post("https://predict-production-28b1.up.railway.app/api/predict/historique", headers = {
-                        'Content-Type': 'application/json',
-                        'Authorization': f'Bearer {token_user}'
-                    },
-                    json={
-                        "salaire_predit": int(pred_val),
-                        "salaire_min": int(pred_min),
-                        "salaire_mensuel": int(pred_max),
-                        "niveau_experience": f"{input_df['experience'].iloc[0]}",
-                        "date_predit": dates,
-                        "description": f"{input_df['desc'].iloc[0]}",
-                        "competences": f"{input_df['competences'].iloc[0]}",
-                        "region": f"{input_df['region'].iloc[0]}",
-                        "titre": f"{input_df['metier'].iloc[0]}"
-                    }
-                    ) 
+                    requete_historique = requests.post(
+                        "https://predict-production-28b1.up.railway.app/api/predict/historique",
+                        headers={
+                            'Content-Type': 'application/json',
+                            'Authorization': f'Bearer {token_user}'
+                        },
+                        json={
+                            "salaire_predit": int(pred_val),
+                            "salaire_min": int(pred_min),
+                            "salaire_mensuel": int(pred_max),
+                            "niveau_experience": f"{input_df['experience'].iloc[0]}",
+                            "date_predit": dates,
+                            "description": f"{input_df['desc'].iloc[0]}",
+                            "competences": f"{input_df['competences'].iloc[0]}",
+                            "region": f"{input_df['region'].iloc[0]}",
+                            "titre": f"{input_df['metier'].iloc[0]}"
+                        }
+                    )
 
                 except Exception as e:
                     status.update(label="❌ Erreur critique", state="error")
@@ -475,18 +433,16 @@ if predict_btn:
 
 if st.session_state['prediction']:
     pred = st.session_state['prediction']
-    
-    st.write("") 
+
+    st.write("")
 
     # --- A. HEADER & BOUTON DOWNLOAD (HAUT GAUCHE) ---
     col_dl, col_title = st.columns([1, 4])
-    
+
     with col_dl:
-        # 1. PRÉPARATION DES DONNÉES POUR LE RAPPORT
-        import datetime
-        date_jour = datetime.datetime.now().strftime("%d/%m/%Y")
-        
-        # On crée les badges HTML pour les compétences
+        import datetime as dt
+        date_jour = dt.datetime.now().strftime("%d/%m/%Y")
+
         skills_html = ""
         if st.session_state['extracted_skills']:
             for s in st.session_state['extracted_skills']:
@@ -494,7 +450,6 @@ if st.session_state['prediction']:
         else:
             skills_html = "<i>Aucune compétence technique spécifique détectée.</i>"
 
-    
         html_report = f"""
         <!DOCTYPE html>
         <html>
@@ -504,34 +459,27 @@ if st.session_state['prediction']:
             <style>
                 body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f4f9; padding: 40px; color: #333; }}
                 .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
-                
-                /* Header */
+
                 .header {{ border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }}
                 .logo {{ font-size: 24px; font-weight: bold; color: #2563eb; }}
                 .date {{ color: #888; font-size: 14px; }}
-                
-                /* Salary Box */
+
                 .salary-box {{ background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 40px; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2); }}
                 .salary-title {{ text-transform: uppercase; font-size: 14px; letter-spacing: 1px; opacity: 0.9; margin-bottom: 5px; }}
                 .salary-amount {{ font-size: 48px; font-weight: 700; margin: 0; }}
                 .salary-range {{ font-size: 18px; margin-top: 10px; opacity: 0.9; background: rgba(255,255,255,0.2); display: inline-block; padding: 5px 15px; border-radius: 20px; }}
 
-                /* Sections */
                 .section-title {{ font-size: 18px; font-weight: 700; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #2563eb; padding-left: 10px; }}
-                
-                /* Grid Info */
+
                 .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
                 .info-item {{ background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }}
                 .label {{ font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 5px; }}
                 .value {{ font-size: 16px; font-weight: 600; color: #0f172a; }}
 
-                /* Badges Skills */
                 .badge {{ display: inline-block; background-color: #e0f2fe; color: #0369a1; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-right: 5px; margin-bottom: 5px; }}
 
-                /* Description */
                 .desc-box {{ background: #fff; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; font-size: 14px; line-height: 1.6; color: #475569; white-space: pre-wrap; }}
 
-                /* Footer */
                 .footer {{ margin-top: 50px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px; }}
             </style>
         </head>
@@ -571,9 +519,8 @@ if st.session_state['prediction']:
             </div>
         </body>
         </html>
-        """ 
-        
-        
+        """
+
         st.download_button(
             label=" Télécharger Rapport Complet",
             data=html_report,
@@ -588,14 +535,13 @@ if st.session_state['prediction']:
 
     st.markdown("---")
 
-    # --- B. LA CARTE INTERACTIVE (EN PREMIER) ---
+    # --- B. CARTE ---
     col_map_filters, col_map_viz = st.columns([1, 3])
-    
+
     with col_map_filters:
         st.markdown("####  Carte")
-        # AJOUT DES CLÉS UNIQUES (key=...) POUR CORRIGER TON ERREUR
         view_mode = st.radio("Zoom :", ["Région", "Département"], index=0, key="radio_map_zoom")
-        st.write("") 
+        st.write("")
         metric_label = st.radio(" Indicateur :", ["Médiane", "Moyenne"], index=0, key="radio_map_metric")
         metric_func = 'median' if "Médiane" in metric_label else 'mean'
 
@@ -604,7 +550,7 @@ if st.session_state['prediction']:
             map_df = df[df['metier'] == target_metier].groupby('region')['salaire_avg'].agg(metric_func).reset_index()
             geojson = load_geojson("regions")
             loc_col, key_json, zoom_lvl = 'region', "properties.nom", 4.5
-        else: 
+        else:
             map_df = df[df['metier'] == target_metier].groupby('departement')['salaire_avg'].agg(metric_func).reset_index()
             map_df['departement'] = map_df['departement'].astype(str).str.zfill(2)
             geojson = load_geojson("departements")
@@ -622,20 +568,16 @@ if st.session_state['prediction']:
         else:
             st.error("Carte indisponible.")
 
-    # --- C. KPIs---
+    # --- C. KPIs ---
     st.markdown("### Indicateurs Clés")
-    
- 
 
     c1, c2, c3, c4 = st.columns(4)
-    
 
     mask_context = (df['metier'] == target_metier) & (df['region'] == target_region)
     market_data = df[mask_context]
     market_val = market_data['salaire_avg'].median() if not market_data.empty else 0
     sample_size = len(market_data)
 
-    # --- AFFICHAGE DE la CARTE ---
     with c1:
         st.markdown(f"""
         <div class="metric-card">
@@ -660,10 +602,7 @@ if st.session_state['prediction']:
         </div>
         """, unsafe_allow_html=True)
 
-
-
     st.markdown("---")
-
     st.markdown("---")
 
     # --- D. ANALYSE DÉTAILLÉE ---
@@ -673,30 +612,34 @@ if st.session_state['prediction']:
         with st.container(border=True):
             st.markdown("#### Comparateur de Métiers")
             all_metiers = sorted(df['metier'].unique())
-            try: default_ix = all_metiers.index("Data Engineer")
-            except: default_ix = 0
+            try:
+                default_ix = all_metiers.index("Data Engineer")
+            except:
+                default_ix = 0
             comp_metier = st.selectbox("Comparer avec :", all_metiers, index=default_ix, key="sb_compare_metier")
-            
+
             df_curr = df[df['metier'] == target_metier]
             df_comp = df[df['metier'] == comp_metier]
             med_curr = df_curr['salaire_avg'].median()
             med_comp = df_comp['salaire_avg'].median()
-            
+
             fig_comp = go.Figure(data=[
                 go.Bar(name=target_metier, x=[target_metier], y=[med_curr], marker_color='#2563eb', text=f"{med_curr:,.0f}€", textposition='auto'),
                 go.Bar(name=comp_metier, x=[comp_metier], y=[med_comp], marker_color='#94a3b8', text=f"{med_comp:,.0f}€", textposition='auto')
             ])
             fig_comp.update_layout(title="Salaire Médian Comparé", height=300, margin=dict(l=20, r=20, t=30, b=20), showlegend=False)
             st.plotly_chart(fig_comp, use_container_width=True, config={'displayModeBar': False})
-            
+
             st.markdown("**Top Compétences :**")
             skills_curr = get_top_skills_for_job(df, target_metier)
             skills_comp = get_top_skills_for_job(df, comp_metier)
             c1, c2 = st.columns(2)
             with c1:
-                for s in skills_curr[:4]: st.caption(f"🔹 {s}")
+                for s in skills_curr[:4]:
+                    st.caption(f"🔹 {s}")
             with c2:
-                for s in skills_comp[:4]: st.caption(f"🔸 {s}")
+                for s in skills_comp[:4]:
+                    st.caption(f"🔸 {s}")
 
     with col_ai:
         with st.container(border=True):
@@ -708,41 +651,47 @@ if st.session_state['prediction']:
                     color="importance_score", color_continuous_scale="Teal",
                     title="Mots-clés détectés"
                 )
-                fig_skills.update_layout(title=None, height=400, margin=dict(l=0, r=0, t=0, b=0), showlegend=False, xaxis=dict(showticklabels=False, title=None), yaxis=dict(title=None))
+                fig_skills.update_layout(
+                    title=None,
+                    height=400,
+                    margin=dict(l=0, r=0, t=0, b=0),
+                    showlegend=False,
+                    xaxis=dict(showticklabels=False, title=None),
+                    yaxis=dict(title=None)
+                )
                 st.plotly_chart(fig_skills, use_container_width=True, config={'displayModeBar': False})
             else:
                 st.info("Collez une description pour voir l'analyse.")
 
     st.markdown("---")
 
-    # ==========================================
-    # 8. CENTRE DE CARRIÈRE & RECRUTEMENT
-    # ==========================================
-    st.header("Centre de Recrutement & Carrière")
+# ==========================================
+# 8. CENTRE DE CARRIÈRE & RECRUTEMENT
+# ==========================================
+st.header("Centre de Recrutement & Carrière")
+
 tab_candidat, tab_recruteur = st.tabs([" Espace Candidat (optimiser vos candidature)", " Espace Recruteur (Tri CVs)"])
 
 with tab_candidat:
-    st.info(f"** Posez vos questions sur votre compatibilité avec le poste.")
+    st.info("** Posez vos questions sur votre compatibilité avec le poste.")
     col_cv, col_chat = st.columns([1, 2])
 
     with col_cv:
         uploaded_cv = st.file_uploader("Analysez votre CV (PDF)", type=["pdf"], key="cv_upload_candidat")
-        if uploaded_cv: st.success("✅ CV chargé")
+        if uploaded_cv:
+            st.success("✅ CV chargé")
 
     with col_chat:
-        # Initialisation mémoire
         if "messages_candidat" not in st.session_state:
             st.session_state.messages_candidat = []
         if "vector_store_candidat" not in st.session_state:
             st.session_state.vector_store_candidat = None
 
-        # Traitement RAG avec le nouveau moteur
         if uploaded_cv and st.session_state.vector_store_candidat is None:
             with st.spinner(" Analyse du CV..."):
                 st.session_state.vector_store_candidat = process_pdf_and_create_vector_db(uploaded_cv)
                 st.rerun()
 
-        # Affichage Chat
         chat_container = st.container(height=350)
         with chat_container:
             for msg in st.session_state.messages_candidat:
@@ -762,40 +711,101 @@ with tab_candidat:
             if action_prompt:
                 st.session_state.messages_candidat.append({"role": "user", "content": action_prompt})
                 with chat_container:
-                    with st.chat_message("user"): st.markdown(action_prompt)
+                    with st.chat_message("user"):
+                        st.markdown(action_prompt)
                     with st.chat_message("assistant"):
                         with st.spinner("réfléchit..."):
-                            # APPEL AU NOUVEAU RAG ENGINE 
                             selected_key = random.choice(KEYS)
-                            qa_chain = get_rag_chain(st.session_state.vector_store_candidat,selected_key)
-                            
+                            qa_chain = get_rag_chain(st.session_state.vector_store_candidat, selected_key)
+
                             full_query = f"ACTION: {action_prompt} | OFFRE: {target_desc[:500]}"
                             response = qa_chain.invoke(full_query)
-                            
+
                             st.session_state.messages_candidat.append({"role": "assistant", "content": response})
                             st.markdown(response)
-                    
-                  
-                   
-    # --- ONGLET 2 : RECRUTEUR ---
-    with tab_recruteur:
-        st.markdown("#### 📂 Analyse d'un dossier de resume")
-        st.write(f"Identifiez instantanément les meilleurs profils pour le poste de **{target_metier}**.")
-        uploaded_files = st.file_uploader("Glissez-déposez les CVs (PDF)", type=['pdf'], accept_multiple_files=True, key="bulk_upload")
-        
-        if uploaded_files:
-            if st.button(f" Analyser {len(uploaded_files)} CVs", key="btn_launch_bulk"):
-                with st.spinner("Classement en cours..."):
-                    ranked_df = rank_cvs(uploaded_files, target_desc)
-                    st.success("Terminé !")
-                    if len(ranked_df) >= 3:
-                        c1, c2, c3 = st.columns(3)
-                        c1.metric("🥇 Top 1", ranked_df.iloc[0]['Nom du Fichier'], f"{ranked_df.iloc[0]['Score de Pertinence']}%")
-                        c2.metric("🥈 Top 2", ranked_df.iloc[1]['Nom du Fichier'], f"{ranked_df.iloc[1]['Score de Pertinence']}%")
-                        c3.metric("🥉 Top 3", ranked_df.iloc[2]['Nom du Fichier'], f"{ranked_df.iloc[2]['Score de Pertinence']}%")
-                    
-                    st.dataframe(
-                        ranked_df[['Score de Pertinence', 'Nom du Fichier']], 
-                        use_container_width=True, 
-                        column_config={"Score de Pertinence": st.column_config.ProgressColumn("Pertinence", format="%.1f%%", min_value=0, max_value=100)}
-                    )
+
+with tab_recruteur:
+    st.markdown("#### 📂 Analyse d'un dossier de resume")
+    st.write(f"Identifiez instantanément les meilleurs profils pour le poste de **{target_metier}**.")
+    uploaded_files = st.file_uploader("Glissez-déposez les CVs (PDF)", type=['pdf'], accept_multiple_files=True, key="bulk_upload")
+
+    if uploaded_files:
+        if st.button(f" Analyser {len(uploaded_files)} CVs", key="btn_launch_bulk"):
+            with st.spinner("Classement en cours..."):
+                ranked_df = rank_cvs(uploaded_files, target_desc)
+                st.success("Terminé !")
+                if len(ranked_df) >= 3:
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("🥇 Top 1", ranked_df.iloc[0]['Nom du Fichier'], f"{ranked_df.iloc[0]['Score de Pertinence']}%")
+                    c2.metric("🥈 Top 2", ranked_df.iloc[1]['Nom du Fichier'], f"{ranked_df.iloc[1]['Score de Pertinence']}%")
+                    c3.metric("🥉 Top 3", ranked_df.iloc[2]['Nom du Fichier'], f"{ranked_df.iloc[2]['Score de Pertinence']}%")
+
+                st.dataframe(
+                    ranked_df[['Score de Pertinence', 'Nom du Fichier']],
+                    use_container_width=True,
+                    column_config={
+                        "Score de Pertinence": st.column_config.ProgressColumn(
+                            "Pertinence", format="%.1f%%", min_value=0, max_value=100
+                        )
+                    }
+                )
+
+# ==========================================
+# 9. SECTION AVIS UTILISATEUR (OUVERTE PAR LE BOUTON SIDEBAR)
+# ==========================================
+# Bouton pour ouvrir le pop-up
+# --- Modal d'avis ---
+@st.dialog("Donnez votre avis", width="medium")
+def avis_dialog():
+    st.write("Nous serions ravis d'avoir votre avis sur l'application")
+
+    satisfaction = st.slider("Votre satisfaction globale", 1, 5, 4, 1)
+    commentaire = st.text_area(
+        "Commentaire",
+        placeholder="Dites-nous ce que vous aimez ou ce qu'on peut améliorer..."
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        envoyer = st.button("Envoyer mon avis", type="primary", use_container_width=True)
+    with col2:
+        annuler = st.button("Annuler", use_container_width=True)
+
+    if envoyer:
+        # Exemple : appel API pour enregistrer l'avis (à adapter)
+        try:
+            payload = {
+                "satisfaction": f"{satisfaction}",
+                "commentaire": f"{commentaire}",
+            }
+            r = requests.post(
+                "https://predict-production-28b1.up.railway.app/api/predict/feedback",
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {token_user}'
+                },
+                json=payload,
+                timeout=10,
+            )
+            if r.status_code == 200:
+                st.success("Merci pour votre avis !")
+            else:
+                st.warning("Avis envoyé, mais le serveur a retourné une réponse inattendue.")
+        except Exception as e:
+            st.error(f"Erreur lors de l'envoi de l'avis : {e}")
+
+        # Ferme le modal en forçant un rerun
+        st.rerun()
+
+    if annuler:
+        # Ferme simplement le modal
+        st.rerun()
+
+if "last_feedback" in st.session_state:
+    fb = st.session_state["last_feedback"]
+    st.write(f"Dernier avis : {fb}")
+
+# Bouton qui ouvre le modal
+if st.sidebar.button("Donner mon avis",use_container_width=True,key="btn_avis"):
+    avis_dialog()
+

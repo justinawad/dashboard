@@ -13,6 +13,5 @@ faiss-cpu
 pypdf
 sentence-transformers
 langchain-groq
-langchain-huggingface
 python-dotenv
 PIT 
