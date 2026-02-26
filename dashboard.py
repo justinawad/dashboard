@@ -741,9 +741,9 @@ with tab_recruteur:
                 st.success("Terminé !")
                 if len(ranked_df) >= 3:
                     c1, c2, c3 = st.columns(3)
-                    c1.metric("🥇 Top 1", ranked_df.iloc[0]['Nom du Fichier'], f"{ranked_df.iloc[0]['Score de Pertinence']}%")
-                    c2.metric("🥈 Top 2", ranked_df.iloc[1]['Nom du Fichier'], f"{ranked_df.iloc[1]['Score de Pertinence']}%")
-                    c3.metric("🥉 Top 3", ranked_df.iloc[2]['Nom du Fichier'], f"{ranked_df.iloc[2]['Score de Pertinence']}%")
+                    c1.metric(" Top 1", ranked_df.iloc[0]['Nom du Fichier'], f"{ranked_df.iloc[0]['Score de Pertinence']}%")
+                    c2.metric(" Top 2", ranked_df.iloc[1]['Nom du Fichier'], f"{ranked_df.iloc[1]['Score de Pertinence']}%")
+                    c3.metric(" Top 3", ranked_df.iloc[2]['Nom du Fichier'], f"{ranked_df.iloc[2]['Score de Pertinence']}%")
 
                 st.dataframe(
                     ranked_df[['Score de Pertinence', 'Nom du Fichier']],
@@ -781,8 +781,9 @@ def avis_dialog():
         try:
             payload = {
                 "dates":f"{times}",
-                "satisfaction": f"{satisfaction}",
                 "commentaire": f"{commentaire}",
+                "note": f"{satisfaction}"
+                
             }
             r = requests.post(
                 "https://predict-production-28b1.up.railway.app/api/predict/feedback",
@@ -791,7 +792,6 @@ def avis_dialog():
                     'Authorization': f'Bearer {token_user}'
                 },
                 json=payload,
-                timeout=10,
             )
             if r.status_code == 200:
                 st.success("Merci pour votre avis !")
