@@ -758,7 +758,7 @@ with tab_recruteur:
 @st.dialog("Donnez votre avis", width="medium")
 def avis_dialog():
     st.write("Nous serions ravis d'avoir votre avis sur l'application")
-
+    times = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     satisfaction = st.slider("Votre satisfaction globale", 1, 5, 4, 1)
     commentaire = st.text_area(
         "Commentaire",
@@ -775,6 +775,7 @@ def avis_dialog():
         # Exemple : appel API pour enregistrer l'avis (à adapter)
         try:
             payload = {
+                "dates":"f{times}",
                 "satisfaction": f"{satisfaction}",
                 "commentaire": f"{commentaire}",
             }
